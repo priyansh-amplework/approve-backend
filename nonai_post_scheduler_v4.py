@@ -100,15 +100,7 @@ POSTING_SCHEDULE = {
 # IMAGE CONCEPTS - EssentiaScan/NonAI ONLY
 # ======================================================
 IMAGE_CONCEPTS = [
-    {
-        "campaign": "EssentiaScan",
-        "title": "Deepfake Panic Call",
-        "concept": "deepfake_protection",
-        "description": "Cyber awareness: phone showing AI voice clone warning, verification screen, Non-AI Score check",
-        "text_overlay": "AI can copy a voice.\nDon't trust panic.\nVerify the human.\n\nEssentiaScan",
-        "color_scheme": "tech_red_alert",
-        "style": "modern, tech UI, security focused"
-    },
+    
     {
         "campaign": "EssentiaScan",
         "title": "Catfish Reveal",
