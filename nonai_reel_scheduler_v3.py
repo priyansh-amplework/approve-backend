@@ -90,12 +90,7 @@ for _platform in [ "x", "linkedin",  "facebook"]:
 # REEL CONCEPTS  (5 concepts, each with full metadata)
 # ======================================================
 REEL_CONCEPTS = [
-    {
-        "concept":     "deepfake_protection",
-        "title":       "Deepfake Panic Call",
-        "prompt":      "18-45 age receives frantic call, phone UI overlay showing AI voice clone warning, taps verify button, Non-AI score appears — 15-second vertical reel, dramatic music.",
-        "description": "Emotional scenario showing deepfake threat and instant verification.",
-    },
+   
     {
         "concept":     "social_media_trust",
         "title":       "Catfish Reveal",

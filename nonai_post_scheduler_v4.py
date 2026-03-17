@@ -63,38 +63,38 @@ MIN_POSTS_TO_EVALUATE = 3   # need at least this many posts before judging
 # ======================================================
 # STATIC IMAGE POSTING SCHEDULE (ET)
 # ======================================================
-# POSTING_SCHEDULE = {
+POSTING_SCHEDULE = {
+    "instagram": [
+        {"days": [0, 1, 2, 3, 4], "hour": 9,  "minute": 0},
+        {"days": [0, 1, 2, 3, 4], "hour": 12, "minute": 30},
+        {"days": [0, 1, 2, 3, 4], "hour": 18, "minute": 0},
+        {"days": [5, 6],          "hour": 10, "minute": 0},
+        {"days": [5, 6],          "hour": 19, "minute": 0},
+    ],
+    "facebook": [
+        {"days": [0, 2, 4], "hour": 10, "minute": 0},
+        {"days": [1, 3],    "hour": 14, "minute": 0},
+        {"days": [5, 6],    "hour": 11, "minute": 0},
+    ],
+    "linkedin": [
+        {"days": [0, 2, 4], "hour": 8,  "minute": 30},
+        {"days": [1, 3],    "hour": 12, "minute": 0},
+    ],
+    "x": [
+        {"days": [0, 1, 2, 3, 4], "hour": 11, "minute": 0},
+        {"days": [0, 1, 2, 3, 4], "hour": 15, "minute": 0},
+        {"days": [5, 6],          "hour": 13, "minute": 0},
+    ],
+}
+#POSTING_SCHEDULE = {
 #     "instagram": [
 #         {"days": [0, 1, 2, 3, 4], "hour": 9,  "minute": 0},
-#         {"days": [0, 1, 2, 3, 4], "hour": 12, "minute": 30},
+#        {"days": [0, 1, 2, 3, 4], "hour": 12, "minute": 30},
 #         {"days": [0, 1, 2, 3, 4], "hour": 18, "minute": 0},
 #         {"days": [5, 6],          "hour": 10, "minute": 0},
 #         {"days": [5, 6],          "hour": 19, "minute": 0},
-#     ],
-#     "facebook": [
-#         {"days": [0, 2, 4], "hour": 10, "minute": 0},
-#         {"days": [1, 3],    "hour": 14, "minute": 0},
-#         {"days": [5, 6],    "hour": 11, "minute": 0},
-#     ],
-#     "linkedin": [
-#         {"days": [0, 2, 4], "hour": 8,  "minute": 30},
-#         {"days": [1, 3],    "hour": 12, "minute": 0},
-#     ],
-#     "x": [
-#         {"days": [0, 1, 2, 3, 4], "hour": 11, "minute": 0},
-#         {"days": [0, 1, 2, 3, 4], "hour": 15, "minute": 0},
-#         {"days": [5, 6],          "hour": 13, "minute": 0},
-#     ],
-# }
-POSTING_SCHEDULE = {
-     "instagram": [
-         {"days": [0, 1, 2, 3, 4], "hour": 9,  "minute": 0},
-         {"days": [0, 1, 2, 3, 4], "hour": 12, "minute": 30},
-         {"days": [0, 1, 2, 3, 4], "hour": 18, "minute": 0},
-         {"days": [5, 6],          "hour": 10, "minute": 0},
-         {"days": [5, 6],          "hour": 19, "minute": 0},
-     ]
-}
+#     ]
+#}
 
 # ======================================================
 # IMAGE CONCEPTS - EssentiaScan/NonAI ONLY
