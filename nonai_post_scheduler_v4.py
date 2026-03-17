@@ -51,7 +51,8 @@ if not GEMINI_API_KEY or not AYRSHARE_API_KEY or not DATABASE_URL:
 # ======================================================
 # CONFIG
 # ======================================================
-TIMEZONE = ZoneInfo("America/New_York")
+#TIMEZONE = ZoneInfo("America/New_York")
+TIMEZONE = ZoneInfo("Asia/Kolkata")
 PROMPT_FILE = "last_prompt_index.txt"
 
 # ── Performance thresholds ────────────────────────────
@@ -63,44 +64,58 @@ MIN_POSTS_TO_EVALUATE = 3   # need at least this many posts before judging
 # ======================================================
 # STATIC IMAGE POSTING SCHEDULE (ET)
 # ======================================================
-POSTING_SCHEDULE = {
-    "instagram": [
-        {"days": [0, 1, 2, 3, 4], "hour": 9,  "minute": 0},
-        {"days": [0, 1, 2, 3, 4], "hour": 12, "minute": 30},
-        {"days": [0, 1, 2, 3, 4], "hour": 18, "minute": 0},
-        {"days": [5, 6],          "hour": 10, "minute": 0},
-        {"days": [5, 6],          "hour": 19, "minute": 0},
-    ],
-    "facebook": [
-        {"days": [0, 2, 4], "hour": 10, "minute": 0},
-        {"days": [1, 3],    "hour": 14, "minute": 0},
-        {"days": [5, 6],    "hour": 11, "minute": 0},
-    ],
-    "linkedin": [
-        {"days": [0, 2, 4], "hour": 8,  "minute": 30},
-        {"days": [1, 3],    "hour": 12, "minute": 0},
-    ],
-    "x": [
-        {"days": [0, 1, 2, 3, 4], "hour": 11, "minute": 0},
-        {"days": [0, 1, 2, 3, 4], "hour": 15, "minute": 0},
-        {"days": [5, 6],          "hour": 13, "minute": 0},
-    ],
-}
-#POSTING_SCHEDULE = {
+# POSTING_SCHEDULE = {
 #     "instagram": [
 #         {"days": [0, 1, 2, 3, 4], "hour": 9,  "minute": 0},
-#        {"days": [0, 1, 2, 3, 4], "hour": 12, "minute": 30},
+#         {"days": [0, 1, 2, 3, 4], "hour": 12, "minute": 30},
 #         {"days": [0, 1, 2, 3, 4], "hour": 18, "minute": 0},
 #         {"days": [5, 6],          "hour": 10, "minute": 0},
 #         {"days": [5, 6],          "hour": 19, "minute": 0},
-#     ]
-#}
-
+#     ],
+#     "facebook": [
+#         {"days": [0, 2, 4], "hour": 10, "minute": 0},
+#         {"days": [1, 3],    "hour": 14, "minute": 0},
+#         {"days": [5, 6],    "hour": 11, "minute": 0},
+#     ],
+#     "linkedin": [
+#         {"days": [0, 2, 4], "hour": 8,  "minute": 30},
+#         {"days": [1, 3],    "hour": 12, "minute": 0},
+#     ],
+#     "x": [
+#         {"days": [0, 1, 2, 3, 4], "hour": 11, "minute": 0},
+#         {"days": [0, 1, 2, 3, 4], "hour": 15, "minute": 0},
+#         {"days": [5, 6],          "hour": 13, "minute": 0},
+#     ],
+# }
+"""POSTING_SCHEDULE = {
+     "instagram": [
+         {"days": [0, 1, 2, 3, 4], "hour": 9,  "minute": 0},
+         {"days": [0, 1, 2, 3, 4], "hour": 12, "minute": 30},
+         {"days": [0, 1, 2, 3, 4], "hour": 18, "minute": 0},
+         {"days": [5, 6],          "hour": 10, "minute": 0},
+         {"days": [5, 6],          "hour": 19, "minute": 0},
+     ]
+}
+"""
+POSTING_SCHEDULE = {
+     "instagram": [
+         {"days": [0, 1,], "hour": 16,  "minute": 13}
+         
+     ]
+}
 # ======================================================
 # IMAGE CONCEPTS - EssentiaScan/NonAI ONLY
 # ======================================================
 IMAGE_CONCEPTS = [
-    
+    {
+        "campaign": "EssentiaScan",
+        "title": "Deepfake Panic Call",
+        "concept": "deepfake_protection",
+        "description": "Cyber awareness: phone showing AI voice clone warning, verification screen, Non-AI Score check",
+        "text_overlay": "AI can copy a voice.\nDon't trust panic.\nVerify the human.\n\nEssentiaScan",
+        "color_scheme": "tech_red_alert",
+        "style": "modern, tech UI, security focused"
+    },
     {
         "campaign": "EssentiaScan",
         "title": "Catfish Reveal",
@@ -262,9 +277,20 @@ def init_posted_slots_table():
                     tracking_id VARCHAR(100),
                     ayrshare_post_id TEXT,
                     concept_key VARCHAR(100),
+                    social_post_id VARCHAR(100),
                     UNIQUE(platform, post_date, target_hour, target_minute)
                 )
             """)
+            # Safe migrations for columns that might have been added later
+            for col, dtype in [
+                ("ayrshare_post_id", "TEXT"),
+                ("concept_key", "VARCHAR(100)"),
+                ("social_post_id", "VARCHAR(100)"),
+            ]:
+                cur.execute(f"""
+                    ALTER TABLE posted_slots
+                    ADD COLUMN IF NOT EXISTS {col} {dtype}
+                """)
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_posted_slots_lookup
                 ON posted_slots(platform, post_date, target_hour, target_minute)
@@ -1603,66 +1629,89 @@ def run():
         return
 
     log("\n" + "="*60)
-    log("📱 POSTING TO PLATFORMS")
+    log("📋 QUEUING POSTS FOR APPROVAL")
     log("="*60)
 
-    for platform in tracking_data.keys():
+    QUEUE_API_URL = os.getenv("QUEUE_API_URL", "http://localhost:8001")
+    available_platforms = list(tracking_data.keys())
+    queued_count = 0
+
+    for platform, td in tracking_data.items():
         log(f"\n{'─'*60}")
-        log(f"📤 Posting to {platform.upper()}")
+        log(f"📥 Queuing image post for {platform.upper()}")
         log(f"{'─'*60}")
 
-        td            = tracking_data[platform]
         concept       = td["concept"]
         caption       = td["caption"]
         tracking_id   = td["tracking_id"]
         tracking_url  = td["tracking_url"]
         media_url     = td["media_url"]
-        target_hour   = td["target_hour"]
-        target_minute = td["target_minute"]
+        final_image   = td.get("final_image", "")
 
-        success, post_urls, ayrshare_post_id, social_post_ids = create_post(media_url, caption, [platform])
+        # Extract just the hashtag portion from caption for display
+        import re as _re
+        hashtag_matches = _re.findall(r'#\w+', caption)
+        hashtags_str = " ".join(hashtag_matches)
+        # Caption without hashtags for the caption field
+        clean_caption = _re.sub(r'#\w+\s*', '', caption).strip()
 
-        if success:
-            actual_post_url  = post_urls.get(platform)
-            social_post_id   = social_post_ids.get(platform)
+        payload = {
+            "content_type":        "image",
+            "concept_key":         concept["concept"],
+            "concept_title":       concept["title"],
+            "caption":             clean_caption,
+            "hashtags":            hashtags_str,
+            "media_url":           media_url or "",
+            "media_local_path":    final_image or "",
+            "available_platforms": ",".join(available_platforms),
+            "tracking_id":         tracking_id or "",
+            "tracking_url":        tracking_url or "",
+            "source_scheduler":    "nonai_post_scheduler_v4",
+        }
 
-            mark_posted(
-                platform, target_hour, target_minute,
-                actual_post_url, tracking_id,
-                ayrshare_post_id=ayrshare_post_id,
-                concept_key=concept["concept"],
-                social_post_id=social_post_id
+        try:
+            resp = requests.post(
+                f"{QUEUE_API_URL}/api/post-queue/add",
+                json=payload, timeout=10,
             )
+            if resp.status_code == 201:
+                row_id = resp.json().get("id")
+                queued_count += 1
+                # Mark slot as "queued" so we don't regenerate next cron run
+                mark_posted(
+                    platform, td["target_hour"], td["target_minute"],
+                    None, tracking_id,
+                    ayrshare_post_id=None,
+                    concept_key=concept["concept"],
+                    social_post_id=None,
+                )
+                log(f"✅ Queued as post_queue id={row_id}")
+                log(f"   🎨 Concept:   {concept['title']} ({concept['concept']})")
+                log(f"   📊 Tracking:  {tracking_url}")
+                log(f"   🖼  Media URL: {media_url[:60]}..." if media_url else "   🖼  No media URL yet")
+            else:
+                log(f"❌ Queue API error {resp.status_code}: {resp.text[:200]}")
+        except Exception as e:
+            log(f"❌ Could not reach Queue API: {e}")
 
-            if tracking_id and actual_post_url:
-                confirm_tracking_post(tracking_id, actual_post_url, platform,
-                                      ayrshare_post_id=ayrshare_post_id,
-                                      social_post_id=social_post_id)
+        time.sleep(1)
 
-            # If concept is in re-evaluation, increment its counter
-            increment_reeval_count(platform, concept["concept"])
-
-            log(f"✅ {platform.capitalize()} posted")
-            log(f"   📊 Tracking:          {tracking_url}")
-            log(f"   🔗 Post URL:          {actual_post_url}")
-            log(f"   🎨 Concept:           {concept['title']} ({concept['concept']})")
-            log(f"   🆔 Ayrshare Post ID:  {ayrshare_post_id}  ← used for analytics API")
-            log(f"   🔖 Social Post ID:    {social_post_id}  ← platform-native ID")
-            log(f"   🕐 Slot:              {target_hour:02d}:{target_minute:02d}")
-        else:
-            log(f"❌ Failed to post to {platform}")
-
-        time.sleep(2)
+    log(f"\n✅ {queued_count}/{len(tracking_data)} posts queued for human review")
+    log("   👉 Open the dashboard Post Queue tab to approve & publish")
 
     # ── Step 5: Cleanup ──────────────────────────────────
+    # Keep final images; they may still be needed for approval upload
+    # Only remove the base (pre-QR) images
     for td in tracking_data.values():
-        for fp in [td.get("base_image"), td.get("final_image")]:
-            if fp and os.path.exists(fp):
-                os.remove(fp)
-    log("🗑 Cleaned up image files")
+        base = td.get("base_image")
+        final = td.get("final_image")
+        # Remove base if it's different from final
+        if base and base != final and os.path.exists(base):
+            os.remove(base)
+    log("🗑 Cleaned up temporary base images (final images kept for queue upload)")
 
     log("\n" + "="*60)
-    log("✅ POSTING COMPLETE")
+    log("✅ QUEUE RUN COMPLETE")
     log("="*60)
 
 

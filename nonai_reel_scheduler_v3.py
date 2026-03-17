@@ -90,7 +90,12 @@ for _platform in [ "x", "linkedin",  "facebook"]:
 # REEL CONCEPTS  (5 concepts, each with full metadata)
 # ======================================================
 REEL_CONCEPTS = [
-   
+    {
+        "concept":     "deepfake_protection",
+        "title":       "Deepfake Panic Call",
+        "prompt":      "Older adult receives frantic call, phone UI overlay showing AI voice clone warning, taps verify button, Non-AI score appears — 15-second vertical reel, dramatic music.",
+        "description": "Emotional scenario showing deepfake threat and instant verification.",
+    },
     {
         "concept":     "social_media_trust",
         "title":       "Catfish Reveal",
@@ -1501,12 +1506,16 @@ def run():
 
     # ── Step 8: Post each platform ───────────────────────────
     log("\n" + "="*60)
-    log("📱 POSTING REELS TO PLATFORMS")
+    log("📋 QUEUING REELS FOR APPROVAL")
     log("="*60)
+
+    QUEUE_API_URL = os.getenv("QUEUE_API_URL", "http://localhost:8001")
+    available_platforms = list(tracking_data.keys())
+    queued_count = 0
 
     for platform in tracking_data:
         log(f"\n{'─'*60}")
-        log(f"📤 Posting reel to {platform.upper()}")
+        log(f"📥 Queuing reel for {platform.upper()}")
         log(f"{'─'*60}")
 
         td            = tracking_data[platform]
@@ -1519,53 +1528,58 @@ def run():
 
         media_url = concept_media_urls.get(concept["concept"])
         if not media_url:
-            log(f"❌ No media URL for {platform} / {concept['concept']} — skipping")
+            log(f"❌ No media URL for {platform} / {concept['concept']} — skipping queue")
             continue
 
-        success, post_urls, ayrshare_post_id, social_post_ids = create_post(
-            media_url, caption, [platform]
-        )
+        # Split caption and hashtags
+        import re as _re
+        hashtag_matches = _re.findall(r'#\w+', caption)
+        hashtags_str = " ".join(hashtag_matches)
+        clean_caption = _re.sub(r'#\w+\s*', '', caption).strip()
 
-        if success:
-            actual_post_url = post_urls.get(platform)
-            social_post_id  = social_post_ids.get(platform)
+        payload = {
+            "content_type":        "reel",
+            "concept_key":         concept["concept"],
+            "concept_title":       concept["title"],
+            "caption":             clean_caption,
+            "hashtags":            hashtags_str,
+            "media_url":           media_url or "",
+            "media_local_path":    "",
+            "available_platforms": ",".join(available_platforms),
+            "tracking_id":         tracking_id or "",
+            "tracking_url":        tracking_url or "",
+            "source_scheduler":    "nonai_reel_scheduler_v3",
+        }
 
-            mark_posted(
-                platform, target_hour, target_minute,
-                actual_post_url, tracking_id,
-                ayrshare_post_id=ayrshare_post_id,
-                concept_key=concept["concept"],
-                social_post_id=social_post_id,
+        try:
+            resp = requests.post(
+                f"{QUEUE_API_URL}/api/post-queue/add",
+                json=payload, timeout=10,
             )
-
-            if tracking_id and actual_post_url:
-                confirm_tracking_post(
-                    tracking_id, actual_post_url, platform,
-                    ayrshare_post_id=ayrshare_post_id,
-                    social_post_id=social_post_id,
+            if resp.status_code == 201:
+                row_id = resp.json().get("id")
+                queued_count += 1
+                # Mark slot so we don't regenerate next cron run
+                mark_posted(
+                    platform, target_hour, target_minute,
+                    None, tracking_id,
+                    ayrshare_post_id=None,
+                    concept_key=concept["concept"],
+                    social_post_id=None,
                 )
-
-            # Track re-evaluation posts if concept was recently re-activated
-            increment_reeval_count(platform, concept["concept"])
-
-            log(f"✅ {platform.capitalize()} reel posted")
-            log(f"   📊 Tracking:          {tracking_url}")
-            log(f"   🔗 Post URL:          {actual_post_url}")
-            log(f"   🎬 Concept:           {concept['title']} ({concept['concept']})")
-            log(f"   🆔 Ayrshare Post ID:  {ayrshare_post_id}  ← used for analytics API")
-            log(f"   🔖 Social Post ID:    {social_post_id}  ← platform-native ID")
-            log(f"   🕐 Slot:              {target_hour:02d}:{target_minute:02d}")
-
-            if platform.lower() == "instagram":
-                log(f"   📝 Caption: NO URL (Instagram links not clickable)")
-                log(f"   🏷️  Hashtags: 3 brand + 2 Ayrshare auto = 5 total")
+                log(f"✅ Reel queued as post_queue id={row_id}")
+                log(f"   🎬 Concept:   {concept['title']} ({concept['concept']})")
+                log(f"   📊 Tracking:  {tracking_url}")
+                log(f"   🔗 Media URL: {media_url[:60]}...")
             else:
-                log(f"   📝 Caption: includes tracking URL")
-                log(f"   🏷️  Hashtags: 3 brand + 3 Ayrshare auto = 6 total")
-        else:
-            log(f"❌ Failed to post reel to {platform}")
+                log(f"❌ Queue API error {resp.status_code}: {resp.text[:200]}")
+        except Exception as e:
+            log(f"❌ Could not reach Queue API: {e}")
 
-        time.sleep(2)
+        time.sleep(1)
+
+    log(f"\n✅ {queued_count}/{len(tracking_data)} reels queued for human review")
+    log("   👉 Open the dashboard Post Queue tab to approve & publish")
 
     # ── Step 9: Cleanup local video files ────────────────────
     for video_file in concept_videos.values():
